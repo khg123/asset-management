@@ -1,0 +1,55 @@
+{% extends "bootstrap/base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block title %}
+添加类别 - 固定资产管理系统
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-12">
+            <nav class="navbar navbar-default">
+                <div class="container-fluid">
+                    <div class="navbar-header">
+                        <a class="navbar-brand" href="{{ url_for('dashboard') }}">固定资产管理系统</a>
+                    </div>
+                    <div class="collapse navbar-collapse">
+                        <ul class="nav navbar-nav">
+                            <li><a href="{{ url_for('dashboard') }}">资产列表</a></li>
+                            <li><a href="{{ url_for('add_asset') }}">添加资产</a></li>
+                            <li><a href="{{ url_for('categories') }}">类别管理</a></li>
+                        </ul>
+                        <ul class="nav navbar-nav navbar-right">
+                            <li><a href="#">{{ user.username }} ({{ '管理员' if user.role == 'admin' else '普通用户' }})</a></li>
+                            <li><a href="{{ url_for('logout') }}">退出登录</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-6 col-md-offset-3">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">添加类别</h3>
+                </div>
+                <div class="panel-body">
+                    {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+                    {{ wtf.quick_form(form, form_type="horizontal", horizontal_columns=('sm', 3, 9)) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1983 @@
+{% extends "bootstrap/base.html" %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block title %}
+资产仪表盘 - 固定资产管理系统
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f5f7fa;
+        margin: 0;
+        padding: 0;
+    }
+    .sidebar {
+        width: 200px;
+        height: 100vh;
+        background-color: #2c3e50;
+        color: #ecf0f1;
+        position: fixed;
+        left: 0;
+        top: 0;
+        overflow-y: auto;
+        padding-top: 20px;
+    }
+    .sidebar a {
+        color: #ecf0f1;
+        text-decoration: none;
+        display: block;
+        padding: 10px 20px 10px 35px;
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    .sidebar .nav-section a {
+        padding-left: 50px;
+    }
+    .sidebar a:hover {
+        background-color: #34495e;
+        padding-left: 40px;
+        border-left-color: rgba(52,152,219,0.5);
+    }
+    .sidebar .nav-section a:hover {
+        padding-left: 55px;
+    }
+    .sidebar .active {
+        background-color: #3498db;
+        border-left: 4px solid #2980b9;
+        padding-left: 35px;
+    }
+    .sidebar .nav-section .active {
+        padding-left: 50px;
+    }
+    .sidebar .nav-header {
+        padding: 15px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #bdc3c7;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        background-color: rgba(0,0,0,0.2);
+        margin-top: 10px;
+        margin-bottom: 5px;
+        border-left: 4px solid #3498db;
+    }
+    .sidebar .nav-header.collapsible {
+        cursor: pointer;
+        user-select: none;
+    }
+    .sidebar .nav-header.collapsible:hover {
+        background-color: rgba(0,0,0,0.3);
+    }
+    .sidebar .toggle-icon {
+        display: inline-block;
+        width: 20px;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    .sidebar .nav-header.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+    }
+    .sidebar .nav-section {
+        max-height: 200px;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+    .sidebar .nav-section.collapsed {
+        max-height: 0;
+    }
+    .main-content {
+        margin-left: 200px;
+        min-height: 100vh;
+        background-color: #f5f7fa;
+    }
+    .top-bar {
+        background-color: #ffffff;
+        padding: 15px 30px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    .top-bar h1 {
+        margin: 0;
+        font-size: 20px;
+        color: #2c3e50;
+        display: inline-block;
+    }
+    .top-bar .user-info {
+        float: right;
+        margin-top: 5px;
+    }
+    .content-area {
+        padding: 30px;
+    }
+    .filter-bar {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .filter-bar .form-group {
+        margin-right: 15px;
+        margin-bottom: 0;
+    }
+    .asset-table {
+        background-color: #ffffff;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    .asset-table .table-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        background-color: #f8f9fa;
+    }
+    .asset-table .table-header h2 {
+        margin: 0;
+        font-size: 16px;
+        color: #495057;
+        display: inline-block;
+    }
+    .asset-table .table-header .btn-group {
+        float: right;
+    }
+    .table {
+        margin-bottom: 0;
+    }
+    .table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: #f8f9fa;
+    }
+    .action-buttons {
+        white-space: nowrap;
+    }
+    .action-buttons .btn {
+        margin-right: 5px;
+    }
+    .badge {
+        font-weight: 500;
+    }
+    .alert {
+        margin-top: 20px;
+    }
+    .pagination {
+        margin: 20px 0;
+        float: right;
+    }
+    .checkbox-column {
+        width: 40px;
+    }
+    .text-center {
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sidebar">
+    <div class="nav-header">资产管理系统</div>
+    {% if user.role == 'admin' %}
+    <a href="{{ url_for('dashboard') }}" id="asset-management-link" {% if not content_filter and not page_type or (not content_filter and page_type != 'query') %}class="active"{% endif %}>
+        <span class="glyphicon glyphicon-th-list"></span> 资产管理
+    </a>
+    {% endif %}
+
+    <a href="{{ url_for('dashboard', page='query') }}" id="asset-query-link" {% if (user.role != 'admin') or page_type == 'query' %}class="active"{% endif %}>
+        <span class="glyphicon glyphicon-search"></span> 资产查询
+    </a>
+    {% if user.role == 'admin' %}
+    <div class="nav-header collapsible" onclick="toggleNavSection(this)">
+        <span class="toggle-icon">▼</span> 基础设置
+    </div>
+    <div class="nav-section">
+        <a href="{{ url_for('dashboard', content='category-management') }}" id="category-management-link">
+            <span class="glyphicon glyphicon-tags"></span> 类别管理
+        </a>
+        <a href="{{ url_for('dashboard', content='department-management') }}" id="department-management-link">
+            <span class="glyphicon glyphicon-briefcase"></span> 部门管理
+        </a>
+        <a href="{{ url_for('dashboard', content='user-management') }}" id="user-management-link">
+            <span class="glyphicon glyphicon-user"></span> 用户管理
+        </a>
+    </div>
+    {% endif %}
+    
+    <a href="{{ url_for('logout') }}" style="position: absolute; bottom: 20px; left: 0;">
+        <span class="glyphicon glyphicon-log-out"></span> 退出登录
+    </a>
+</div>
+
+<div class="main-content">
+    <div class="top-bar">
+        <h1>{{ page_title }}</h1>
+        <div class="user-info">
+            <span>{{ user.username }} ({{ '管理员' if user.role == 'admin' else '普通用户' }})</span>
+        </div>
+    </div>
+
+    <!-- 默认内容区域 - 资产列表 -->
+    <!-- 显示所有内容区域的flash消息 -->
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-success" role="alert">
+        {{ message|safe }}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+    
+    <script>
+    // 为错误信息切换按钮添加点击事件
+    document.addEventListener('DOMContentLoaded', function() {
+        var errorToggles = document.querySelectorAll('.error-toggle');
+        errorToggles.forEach(function(toggle) {
+            toggle.addEventListener('click', function() {
+                var errorContent = this.previousElementSibling;
+                var errorHeader = this.previousElementSibling.previousElementSibling;
+                if (errorContent.style.display === 'none') {
+                    errorContent.style.display = 'block';
+                    this.textContent = '点击收起详细错误信息';
+                } else {
+                    errorContent.style.display = 'none';
+                    this.textContent = '点击查看详细错误信息';
+                }
+            });
+        });
+    });
+    </script>
+    
+    <div id="asset-list" class="content-area">
+
+        <!-- 资产管理按钮和查询功能 -->
+        <div class="asset-management-buttons" style="margin-top: -10px; margin-bottom: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+            <form class="form-inline" method="get" action="{{ url_for('dashboard') }}">
+                {% if page_type == 'query' %}
+                <input type="hidden" name="page" value="query">
+                {% endif %}
+                {% if user.role == 'admin' and page_type != 'query' %}
+                <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addAssetModal" style="margin-right: 10px;">
+                    <span class="glyphicon glyphicon-plus"></span> 添加资产
+                </button>
+                <button type="button" class="btn btn-success" data-toggle="modal" data-target="#assetBorrowModal" style="margin-right: 10px;">
+                    <span class="glyphicon glyphicon-exchange"></span> 资产借用归还
+                </button>
+                <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#assetTransferModal" style="margin-right: 10px;">
+                    <span class="glyphicon glyphicon-transfer"></span> 资产移交
+                </button>
+                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#importAssetModal" style="margin-right: 10px;">
+                    <span class="glyphicon glyphicon-import"></span> 导入
+                </button>
+                <button type="button" class="btn btn-success export-selected-btn" style="margin-right: 20px;">
+                    <span class="glyphicon glyphicon-export"></span> 导出
+                </button>
+                {% endif %}
+                
+                {% if page_type == 'query' %}
+                <div class="form-group" style="margin-right: 15px;">
+                    <label for="asset_number" style="margin-right: 5px;">资产编号</label>
+                    <input type="text" class="form-control" id="asset_number" name="asset_number" placeholder="请输入" value="{{ asset_number_filter or '' }}" style="width: 120px;">
+                </div>
+                <div class="form-group" style="margin-right: 15px;">
+                    <label for="asset_department" style="margin-right: 5px;">使用部门</label>
+                    <select class="form-control" id="asset_department" name="department" style="width: 120px;">
+                        <option value="">请选择</option>
+                        {% for department in departments %}
+                        <option value="{{ department.name }}" {% if department_filter == department.name %}selected{% endif %}>{{ department.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-right: 15px;">
+                    <label for="user" style="margin-right: 5px;">使用人</label>
+                    <input type="text" class="form-control" id="user" name="assigned_to" placeholder="请输入" value="{{ assigned_to_filter or '' }}" style="width: 120px;">
+                </div>
+                <div class="form-group" style="margin-right: 15px;">
+                    <label for="asset_category" style="margin-right: 5px;">资产类别</label>
+                    <select class="form-control" id="asset_category" name="category" style="width: 120px;">
+                        <option value="">请选择</option>
+                        {% for category in categories %}
+                        {% if not category.parent %}
+                        <option value="{{ category.name }}" {% if category_filter == category.name %}selected{% endif %}>{{ category.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-right: 15px;">
+                    <label for="asset_status" style="margin-right: 5px;">资产状态</label>
+                    <select class="form-control" id="asset_status" name="status" style="width: 120px;">
+                        <option value="">请选择</option>
+                        <option value="闲置" {% if status_filter == '闲置' %}selected{% endif %}>闲置</option>
+                        <option value="在用" {% if status_filter == '在用' %}selected{% endif %}>在用</option>
+                        <option value="借用中" {% if status_filter == '借用中' %}selected{% endif %}>借用中</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-right: 15px;">
+                    <label for="asset_years" style="margin-right: 5px;">资产年限</label>
+                    <select class="form-control" id="asset_years" name="over_years" style="width: 120px;">
+                        <option value="">请选择</option>
+                        <option value="5" {% if request.args.get('over_years') == '5' %}selected{% endif %}>超5年</option>
+                        <option value="10" {% if request.args.get('over_years') == '10' %}selected{% endif %}>超10年</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-right: 10px;">查询</button>
+                <button type="button" class="btn btn-default" onclick="window.location.href='{{ url_for('dashboard', page='query') }}'">重置</button>
+                {% endif %}
+            </form>
+            
+            <!-- 导出表单 -->
+            <form id="export-form" method="post" action="{{ url_for('export_assets') }}" style="display: none;">
+                {{ form.hidden_tag() }}
+                <input type="hidden" id="selected-assets" name="selected_assets">
+            </form>
+        </div>
+
+        <!-- 资产表格 -->
+        <div class="asset-table">
+            <div class="table-header">
+
+            </div>
+            <table class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th class="checkbox-column">
+                            <input type="checkbox" id="select-all">
+                        </th>
+                        <th>资产编号</th>
+                        <th>部门</th>
+                        <th>使用人</th>
+                        <th>类别</th>
+                        <th>型号</th>
+                        <th>金额</th>
+                        <th>数量</th>
+                        <th>采购日期</th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if assets %}
+                    {% for asset in assets %}
+                    <tr class="asset-row" data-id="{{ asset.id }}" data-asset-number="{{ asset.asset_number }}" data-name="{{ asset.name }}" data-category="{{ asset.category }}" data-model="{{ asset.model }}" data-serial-number="{{ asset.serial_number or '' }}" data-quantity="{{ asset.quantity }}" data-department="{{ asset.department or '' }}" data-assigned-to="{{ asset.assigned_to or '' }}" data-purchase-date="{{ asset.purchase_date.strftime('%Y-%m-%d') if asset.purchase_date else '' }}" data-warranty-period="{{ asset.warranty_period or '' }}" data-purchase-amount="{{ asset.purchase_amount or 0 }}" data-location="{{ asset.location }}" data-status="{{ asset.status }}" data-remarks="{{ asset.remarks or '' }}" data-params="{{ asset.params or '' }}" data-logs='{{ asset_logs[asset.id] | tojson }}'>
+                        <td>
+                            <input type="checkbox" class="asset-checkbox" value="{{ asset.id }}">
+                        </td>
+                        <td>{{ asset.asset_number }}</td>
+                        <td>{{ asset.department or '-' }}</td>
+                        <td>{{ asset.assigned_to or '-' }}</td>
+                        <td>{{ asset.category }}</td>
+                        <td>{{ asset.model or '-' }}</td>
+                        <td>{{ asset.purchase_amount or '-' }}</td>
+                        <td>{{ asset.quantity }}</td>
+                        <td>
+                            {% if asset.purchase_date %}
+                            <a href="{{ url_for('dashboard', 
+                                page=page_type, 
+                                asset_number=asset_number_filter, 
+                                category=category_filter, 
+                                department=department_filter, 
+                                assigned_to=assigned_to_filter, 
+                                status=status_filter, 
+                                over_years=over_years_filter, 
+                                date=asset.purchase_date.strftime('%Y-%m-%d') 
+                            ) }}" style="color: inherit;">
+                                {{ asset.purchase_date.strftime('%Y-%m-%d') }}
+                                {% if date_filter == asset.purchase_date.strftime('%Y-%m-%d') %}
+                                <span class="glyphicon glyphicon-ok"></span>
+                                {% endif %}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>{{ asset.remarks or '-' }}</td>
+                        <td class="action-buttons">
+                            {% if user.role == 'admin' and page_type != 'query' %}
+                            <button type="button" class="btn btn-sm btn-primary edit-asset-btn">
+                                编辑
+                            </button>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-info view-asset-btn">
+                                详情
+                            </button>
+                            {% if user.role == 'admin' and page_type != 'query' %}
+                            <a href="{{ url_for('delete_asset', id=asset.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这个资产吗？');">
+                                删除
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="20" class="text-center">暂无数据</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <!-- 分页 -->
+            <div class="text-center">
+                <ul class="pagination">
+                    <!-- 上一页 -->
+                    <li {% if not pagination.has_prev %}class="disabled"{% endif %}>
+                        <a href="{{ url_for('dashboard', page_num=pagination.prev_num, asset_number=asset_number_filter, category=category_filter, department=department_filter, assigned_to=assigned_to_filter, status=status_filter, over_5_years=over_5_years_filter, page=page_type) }}" {% if not pagination.has_prev %}onclick="return false;"{% endif %}>
+                            上一页
+                        </a>
+                    </li>
+                    
+                    <!-- 页码 -->
+                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            <li {% if page_num == pagination.page %}class="active"{% endif %}>
+                                <a href="{{ url_for('dashboard', page_num=page_num, asset_number=asset_number_filter, category=category_filter, department=department_filter, assigned_to=assigned_to_filter, status=status_filter, over_5_years=over_5_years_filter, page=page_type) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="disabled"><span>...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <!-- 下一页 -->
+                    <li {% if not pagination.has_next %}class="disabled"{% endif %}>
+                        <a href="{{ url_for('dashboard', page_num=pagination.next_num, asset_number=asset_number_filter, category=category_filter, department=department_filter, assigned_to=assigned_to_filter, status=status_filter, over_5_years=over_5_years_filter, page=page_type) }}" {% if not pagination.has_next %}onclick="return false;"{% endif %}>
+                            下一页
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- 类别管理部分 -->
+    <div id="category-management" class="content-area" style="display: none;">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <!-- 添加类别表单 -->
+                <div class="row" style="margin-bottom: 20px;">
+                    <div class="col-md-12">
+                        <form method="post" action="{{ url_for('add_category') }}">
+                            {{ form.hidden_tag() }}
+                            <div class="form-group">
+                                <label for="category_name">类别名称</label>
+                                <input type="text" class="form-control" id="category_name" name="name" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </form>
+                    </div>
+                </div>
+                <!-- 类别列表 -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>类别名称</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category in categories %}
+                                <tr>
+                                    <td>{{ category.id }}</td>
+                                    <td>{{ category.name }}</td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('edit_category', id=category.id) }}" style="display: inline;">
+                                            {{ form.hidden_tag() }}
+                                            <input type="text" name="name" value="{{ category.name }}" class="form-control form-control-sm" style="display: inline; width: 150px; margin-right: 5px;">
+                                            <button type="submit" class="btn btn-sm btn-primary" style="margin-right: 5px;">
+                                                保存
+                                            </button>
+                                        </form>
+                                        <a href="{{ url_for('delete_category', id=category.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这个类别吗？');">
+                                            删除
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户管理部分 -->
+    <div id="user-management" class="content-area" style="display: none;">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <!-- 添加用户表单 -->
+                <div class="row" style="margin-bottom: 20px;">
+                    <div class="col-md-12">
+                        <form method="post" action="{{ url_for('add_user') }}">
+                            {{ form.hidden_tag() }}
+                            <div class="form-group">
+                                <label for="username">用户名</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">密码</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="role">角色</label>
+                                <select class="form-control" id="role" name="role" required>
+                                    <option value="admin">管理员</option>
+                                    <option value="user">普通用户</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </form>
+                    </div>
+                </div>
+                <!-- 用户列表 -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>角色</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user_item in users %}
+                                <tr>
+                                    <td>{{ user_item.id }}</td>
+                                    <td>{{ user_item.username }}</td>
+                                    <td>{{ '管理员' if user_item.role == 'admin' else '普通用户' }}</td>
+                                    <td>
+                                        <!-- 编辑用户表单 -->
+                                        <form method="post" action="{{ url_for('edit_user', id=user_item.id) }}" style="display: inline;">
+                                            {{ form.hidden_tag() }}
+                                            <select class="form-control" name="role" style="display: inline; width: 100px;">
+                                                <option value="admin" {% if user_item.role == 'admin' %}selected{% endif %}>管理员</option>
+                                                <option value="user" {% if user_item.role == 'user' %}selected{% endif %}>普通用户</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <span class="glyphicon glyphicon-pencil"></span>
+                                            </button>
+                                        </form>
+                                        <a href="{{ url_for('delete_user', id=user_item.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这个用户吗？');">
+                                            <span class="glyphicon glyphicon-trash"></span>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 部门管理部分 -->
+    <div id="department-management" class="content-area" style="display: none;">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <!-- 添加部门表单 -->
+                <div class="row" style="margin-bottom: 20px;">
+                    <div class="col-md-12">
+                        <form method="post" action="{{ url_for('add_department') }}">
+                            {{ form.hidden_tag() }}
+                            <div class="form-group">
+                                <label for="department_name">部门名称</label>
+                                <input type="text" class="form-control" id="department_name" name="name" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </form>
+                    </div>
+                </div>
+                <!-- 部门列表 -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>部门名称</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for department in departments %}
+                                <tr>
+                                    <td>{{ department.id }}</td>
+                                    <td>{{ department.name }}</td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('edit_department', id=department.id) }}" style="display: inline;">
+                                            {{ form.hidden_tag() }}
+                                            <input type="text" name="name" value="{{ department.name }}" class="form-control form-control-sm" style="display: inline; width: 150px; margin-right: 5px;">
+                                            <button type="submit" class="btn btn-sm btn-primary" style="margin-right: 5px;">
+                                                保存
+                                            </button>
+                                        </form>
+                                        <a href="{{ url_for('delete_department', id=department.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除这个部门吗？');">
+                                            删除
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+</div>
+
+<!-- 资产详情模态框 -->
+<div class="modal fade" id="assetDetailsModal" tabindex="-1" role="dialog" aria-labelledby="assetDetailsModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="assetDetailsModalLabel">资产详情</h4>
+            </div>
+            <div class="modal-body" style="padding: 10px;">
+                <form>
+                    <input type="hidden" id="detail_asset_id" name="id">
+                    <div class="row" style="padding: 0;">
+                        <div class="col-md-4" style="padding-right: 5px;">
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">资产编号</div>
+                                <div id="detail_asset_number"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">资产名称</div>
+                                <div id="detail_name"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">资产分类</div>
+                                <div id="detail_category"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">型号</div>
+                                <div id="detail_model"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">序列号</div>
+                                <div id="detail_serial_number"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">数量</div>
+                                <div id="detail_quantity"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">所属部门</div>
+                                <div id="detail_department"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">使用人</div>
+                                <div id="detail_assigned_to"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4" style="padding-left: 5px; padding-right: 5px;">
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">购入日期</div>
+                                <div id="detail_purchase_date"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">保修年限</div>
+                                <div id="detail_warranty_period"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">购置金额</div>
+                                <div id="detail_purchase_amount"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">存放地点</div>
+                                <div id="detail_location"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">资产状态</div>
+                                <div id="detail_status"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">备注</div>
+                                <div id="detail_remarks"></div>
+                            </div>
+                            <div style="margin-bottom: 5px; padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">参数配置</div>
+                                <div id="detail_params" style="white-space: pre-wrap;"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4" style="padding-left: 5px;">
+                            <div style="padding: 8px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px; height: 100%;">
+                                <div style="font-weight: bold; margin-bottom: 2px; font-size: 13px; color: #333;">操作日志</div>
+                                <div id="detail_logs" style="max-height: 400px; overflow-y: auto;">
+                                    <div class="alert alert-info" role="alert" style="padding: 6px; margin: 0; font-size: 13px;">
+                                        暂无操作日志
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="margin-top: 8px; padding: 10px;">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 导入资产模态框 -->
+<div class="modal fade" id="importAssetModal" tabindex="-1" role="dialog" aria-labelledby="importAssetModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="importAssetModalLabel">导入资产</h4>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{{ url_for('import_assets') }}" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    <div class="form-group">
+                        <label for="import_file">选择Excel文件</label>
+                        <input type="file" class="form-control-file" id="import_file" name="file" accept=".xlsx,.xls" required>
+                    </div>
+                    <div class="form-group">
+                        <a href="{{ url_for('download_import_template') }}" class="btn btn-success btn-sm">
+                            <span class="glyphicon glyphicon-download-alt"></span> 下载导入模板
+                        </a>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        <p>导入说明：</p>
+                        <ul>
+                            <li>请使用Excel格式文件（.xlsx或.xls）</li>
+                            <li>文件第一行必须包含以下表头：资产编号,资产名称,资产分类,型号,序列号,数量,所属部门,使用人,购入日期,保修年限,购置金额,存放地点,资产状态,备注,参数配置</li>
+                            <li>资产分类和部门必须与系统中已存在的信息一致</li>
+                            <li>资产状态必须是：在用、闲置、维修、报废中的一种</li>
+                            <li>购入日期格式：YYYY-MM-DD，例如：2025-12-31</li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">导入</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 全选/取消全选
+document.getElementById('select-all').addEventListener('change', function() {
+    var checkboxes = document.querySelectorAll('.asset-checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = this.checked;
+    }
+});
+
+// 获取资产日志
+function getAssetLogs(assetId) {
+    // 这里应该发送AJAX请求到服务器获取资产日志
+    // 由于我们已经在模板中获取了所有资产的日志，这里可以直接返回空数组
+    // 实际项目中，应该在这里实现AJAX请求
+    return [];
+}
+
+// 查看资产详情函数
+function viewAssetDetails(id, assetNumber, name, category, model, serialNumber, quantity, department, assignedTo, purchaseDate, warrantyPeriod, purchaseAmount, location, status, remarks, params, logs) {
+    // 填充表单数据
+    document.getElementById('detail_asset_id').value = id;
+    document.getElementById('detail_asset_number').innerHTML = assetNumber || '-';
+    document.getElementById('detail_name').innerHTML = name || '-';
+    document.getElementById('detail_category').innerHTML = category || '-';
+    document.getElementById('detail_model').innerHTML = model || '-';
+    document.getElementById('detail_serial_number').innerHTML = serialNumber || '-';
+    document.getElementById('detail_quantity').innerHTML = quantity || '-';
+    document.getElementById('detail_department').innerHTML = department || '-';
+    document.getElementById('detail_assigned_to').innerHTML = assignedTo || '-';
+    document.getElementById('detail_purchase_date').innerHTML = purchaseDate || '-';
+    document.getElementById('detail_warranty_period').innerHTML = warrantyPeriod || '-';
+    document.getElementById('detail_purchase_amount').innerHTML = purchaseAmount || '-';
+    document.getElementById('detail_location').innerHTML = location || '-';
+    document.getElementById('detail_status').innerHTML = status || '-';
+    document.getElementById('detail_remarks').innerHTML = remarks || '-';
+    document.getElementById('detail_params').innerHTML = params || '-';
+    
+    // 填充操作日志
+    var logsDiv = document.getElementById('detail_logs');
+    if (logs && logs.length > 0) {
+        var logsHtml = '';
+        logs.forEach(function(log) {
+            logsHtml += '<div style="margin-bottom: 5px; padding: 5px; background-color: #ffffff; border-radius: 3px; font-size: 12px;">';
+            logsHtml += '<div style="font-weight: bold; color: #333;">' + (log.operation_date || log.date) + '</div>';
+            logsHtml += '<div style="color: #666;">' + (log.description || log.content) + '</div>';
+            if (log.operator) {
+                logsHtml += '<div style="color: #999; font-size: 10px; margin-top: 2px;">操作人: ' + log.operator + '</div>';
+            }
+            logsHtml += '</div>';
+        });
+        logsDiv.innerHTML = logsHtml;
+    } else {
+        // 如果没有传递日志，尝试获取日志
+        var assetLogs = getAssetLogs(id);
+        if (assetLogs && assetLogs.length > 0) {
+            var logsHtml = '';
+            assetLogs.forEach(function(log) {
+                logsHtml += '<div style="margin-bottom: 5px; padding: 5px; background-color: #ffffff; border-radius: 3px; font-size: 12px;">';
+                logsHtml += '<div style="font-weight: bold; color: #333;">' + (log.operation_date || log.date) + '</div>';
+                logsHtml += '<div style="color: #666;">' + (log.description || log.content) + '</div>';
+                if (log.operator) {
+                    logsHtml += '<div style="color: #999; font-size: 10px; margin-top: 2px;">操作人: ' + log.operator + '</div>';
+                }
+                logsHtml += '</div>';
+            });
+            logsDiv.innerHTML = logsHtml;
+        } else {
+            logsDiv.innerHTML = '<div class="alert alert-info" role="alert">暂无操作日志</div>';
+        }
+    }
+    
+    // 打开模态框
+    $('#assetDetailsModal').modal('show');
+}
+
+// 提交添加资产表单函数
+function submitAddAssetForm(form) {
+    // 阻止默认表单提交
+    
+    // 获取表单数据
+    var formData = new FormData(form);
+    
+    // 发送AJAX请求
+    $.ajax({
+        url: form.action,
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            // 检查响应中是否有错误信息
+            if (response.includes('添加资产失败: 资产编号已存在') || response.includes('添加资产失败:') || response.includes('表单验证失败')) {
+                // 显示错误信息
+                alert(response);
+                // 不关闭模态框
+            } else {
+                // 添加成功，关闭模态框并重定向到干净的dashboard页面
+                $('#addAssetModal').modal('hide');
+                window.location.href = '{{ url_for('dashboard') }}';
+            }
+        },
+        error: function() {
+            // 网络错误
+            alert('添加资产失败: 网络错误');
+        }
+    });
+    
+    return false;
+}
+
+// 提交资产借用表单函数
+function submitBorrowForm(form) {
+    // 获取表单数据
+    var formData = new FormData(form);
+    
+    // 发送AJAX请求
+    $.ajax({
+        url: '{{ url_for('add_borrow') }}',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            // 检查响应中是否有错误信息
+            if (response.includes('添加借用失败:') || response.includes('表单验证失败')) {
+                // 显示错误信息
+                alert(response);
+                // 不关闭模态框
+            } else {
+                // 添加成功，关闭模态框并重定向到干净的dashboard页面
+                $('#assetBorrowModal').modal('hide');
+                window.location.href = '{{ url_for('dashboard') }}';
+            }
+        },
+        error: function() {
+            // 网络错误
+            alert('添加借用失败: 网络错误');
+        }
+    });
+    
+    return false;
+}
+
+// 提交资产移交表单函数
+function submitTransferForm(form) {
+    // 获取表单数据
+    var formData = new FormData(form);
+    
+    // 发送AJAX请求
+    $.ajax({
+        url: '{{ url_for('add_transfer') }}',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            // 检查响应中是否有错误信息
+            if (response.includes('添加移交失败:') || response.includes('表单验证失败')) {
+                // 显示错误信息
+                alert(response);
+                // 不关闭模态框
+            } else {
+                // 添加成功，关闭模态框并重定向到干净的dashboard页面
+                $('#assetTransferModal').modal('hide');
+                window.location.href = '{{ url_for('dashboard') }}';
+            }
+        },
+        error: function() {
+            // 网络错误
+            alert('添加移交失败: 网络错误');
+        }
+    });
+    
+    return false;
+}
+
+// 处理资产归还
+function handleAssetReturn() {
+    // 为所有归还按钮添加点击事件监听器
+    var returnButtons = document.querySelectorAll('.return-asset-btn');
+    returnButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            var borrowId = this.getAttribute('data-id');
+            var assetId = this.getAttribute('data-asset-id');
+            
+            // 显示确认对话框
+            if (confirm('确定要归还此资产吗？')) {
+                // 发送AJAX请求
+                $.ajax({
+                    url: '{{ url_for('return_asset') }}',
+                    type: 'POST',
+                    data: { borrow_id: borrowId },
+                    success: function(response) {
+                        // 检查响应中是否有错误信息
+                        if (response.includes('归还失败:') || response.includes('表单验证失败')) {
+                            // 显示错误信息
+                            alert(response);
+                        } else {
+                            // 归还成功，刷新页面
+                            window.location.href = '{{ url_for('dashboard') }}';
+                        }
+                    },
+                    error: function() {
+                        // 网络错误
+                        alert('归还失败: 网络错误');
+                    }
+                });
+            }
+        });
+    });
+}
+
+// 在DOM加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    // 处理资产归还
+    handleAssetReturn();
+});
+
+// 编辑资产函数
+function editAsset(id, assetNumber, name, category, model, serialNumber, quantity, department, assignedTo, purchaseDate, warrantyPeriod, purchaseAmount, location, status, remarks, params) {
+    // 填充表单数据
+    document.getElementById('edit_asset_id').value = id;
+    document.getElementById('edit_asset_number').value = assetNumber;
+    document.getElementById('edit_model').value = model;
+    document.getElementById('edit_serial_number').value = serialNumber;
+    document.getElementById('edit_quantity').value = quantity;
+    document.getElementById('edit_department').value = department;
+    document.getElementById('edit_assigned_to').value = assignedTo;
+    document.getElementById('edit_purchase_date').value = purchaseDate;
+    document.getElementById('edit_warranty_period').value = warrantyPeriod || '';
+    document.getElementById('edit_purchase_amount').value = purchaseAmount;
+    document.getElementById('edit_location').value = location;
+    document.getElementById('edit_status').value = status;
+    document.getElementById('edit_remarks').value = remarks;
+    document.getElementById('edit_params').value = params;
+    
+    // 设置资产分类
+    var editCategorySelect = document.getElementById('edit_category');
+    editCategorySelect.value = category;
+    
+    // 设置资产名称
+    var editNameInput = document.getElementById('edit_name');
+    editNameInput.value = name;
+    
+    // 打开模态框
+    $('#editAssetModal').modal('show');
+}
+
+// 显示类别编辑表单
+function showEditForm(categoryId) {
+    // 隐藏所有其他编辑表单
+    var allEditForms = document.querySelectorAll('[id^="edit-form-"]');
+    allEditForms.forEach(function(form) {
+        form.style.display = 'none';
+    });
+    
+    // 显示当前编辑表单
+    var editForm = document.getElementById('edit-form-' + categoryId);
+    if (editForm) {
+        editForm.style.display = 'block';
+    }
+}
+
+// 隐藏类别编辑表单
+function hideEditForm(categoryId) {
+    var editForm = document.getElementById('edit-form-' + categoryId);
+    if (editForm) {
+        editForm.style.display = 'none';
+    }
+}
+
+// 显示部门编辑表单
+function showDeptEditForm(deptId) {
+    // 隐藏所有其他编辑表单
+    var allEditForms = document.querySelectorAll('[id^="dept-edit-form-"]');
+    allEditForms.forEach(function(form) {
+        form.style.display = 'none';
+    });
+    
+    // 显示当前编辑表单
+    var editForm = document.getElementById('dept-edit-form-' + deptId);
+    if (editForm) {
+        editForm.style.display = 'block';
+    }
+}
+
+// 隐藏部门编辑表单
+function hideDeptEditForm(deptId) {
+    var editForm = document.getElementById('dept-edit-form-' + deptId);
+    if (editForm) {
+        editForm.style.display = 'none';
+    }
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    // 为所有可折叠导航头部添加点击事件监听器
+    var collapsibleHeaders = document.querySelectorAll('.nav-header.collapsible');
+    collapsibleHeaders.forEach(function(header) {
+        header.addEventListener('click', function() {
+            toggleNavSection(this);
+        });
+    });
+});
+
+// 切换导航栏部分的折叠状态
+function toggleNavSection(header) {
+    // 找到下一个兄弟元素，应该是.nav-section
+    var navSection = header.nextElementSibling;
+    
+    if (navSection && navSection.classList.contains('nav-section')) {
+        // 切换collapsed类
+        header.classList.toggle('collapsed');
+        navSection.classList.toggle('collapsed');
+    }
+}
+</script>
+
+<!-- 添加资产模态框 -->
+<div class="modal fade" id="addAssetModal" tabindex="-1" role="dialog" aria-labelledby="addAssetModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="addAssetModalLabel">添加资产</h4>
+            </div>
+            <div class="modal-body" style="padding: 10px;">
+                <form method="post" action="{{ url_for('add_asset') }}" onsubmit="return submitAddAssetForm(this);">
+                    {{ form.hidden_tag() }}
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-md-4">
+                            <label for="asset_number" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">资产编号</label>
+                            <input type="text" class="form-control" id="asset_number" name="asset_number" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="category" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">资产分类</label>
+                            <select class="form-control" id="category" name="category" required>
+                                <option value="">请选择</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="name" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">资产名称</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-md-4">
+                            <label for="model" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">型号</label>
+                            <input type="text" class="form-control" id="model" name="model">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="serial_number" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">序列号</label>
+                            <input type="text" class="form-control" id="serial_number" name="serial_number">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="quantity" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">数量</label>
+                            <input type="number" class="form-control" id="quantity" name="quantity" value="1" min="1" required>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-md-4">
+                            <label for="department" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">所属部门</label>
+                            <select class="form-control" id="department" name="department" required>
+                                <option value="">请选择部门</option>
+                                {% for department in departments %}
+                                <option value="{{ department.name }}">{{ department.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="assigned_to" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">使用人</label>
+                            <input type="text" class="form-control" id="assigned_to" name="assigned_to">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="purchase_date" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">购入日期</label>
+                            <input type="date" class="form-control" id="purchase_date" name="purchase_date" required>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-md-4">
+                            <label for="warranty_period" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">保修年限</label>
+                            <input type="number" class="form-control" id="warranty_period" name="warranty_period" min="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="purchase_amount" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">购置金额</label>
+                            <input type="number" class="form-control" id="purchase_amount" name="purchase_amount" step="0.01" min="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="location" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">存放地点</label>
+                            <input type="text" class="form-control" id="location" name="location">
+                        </div>
+                    </div>
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-md-4">
+                            <label for="status" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">资产状态</label>
+                            <select class="form-control" id="status" name="status" required>
+                                <option value="在用">在用</option>
+                                <option value="闲置">闲置</option>
+                                <option value="维修">维修</option>
+                                <option value="报废">报废</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="remarks" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">备注</label>
+                            <input type="text" class="form-control" id="remarks" name="remarks">
+                        </div>
+                    </div>
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-md-12">
+                            <label for="params" style="font-weight: bold; margin-bottom: 2px; font-size: 14px;">参数配置</label>
+                            <textarea class="form-control" id="params" name="params" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="margin-top: 10px;">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 资产借用归还模态框 -->
+<div class="modal fade" id="assetBorrowModal" tabindex="-1" role="dialog" aria-labelledby="assetBorrowModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="assetBorrowModalLabel">资产借用归还</h4>
+            </div>
+            <div class="modal-body">
+                <!-- 标签页导航 -->
+                <ul class="nav nav-tabs" role="tablist">
+                    <li role="presentation" class="active"><a href="#borrow-tab" aria-controls="borrow-tab" role="tab" data-toggle="tab">资产借用</a></li>
+                    <li role="presentation"><a href="#return-tab" aria-controls="return-tab" role="tab" data-toggle="tab">资产归还</a></li>
+                </ul>
+                
+                <!-- 标签页内容 -->
+                <div class="tab-content" style="margin-top: 20px;">
+                    <!-- 资产借用标签页 -->
+                    <div role="tabpanel" class="tab-pane active" id="borrow-tab">
+                        <form method="post" action="#" onsubmit="return submitBorrowForm(this);">
+                            <div class="form-group">
+                                <label for="asset_id">资产选择</label>
+                                <select class="form-control" id="asset_id" name="asset_id" required onchange="showAssetDetails(this.value)">
+                                    <option value="">请选择资产</option>
+                                    {% for asset in all_assets %}
+                                    {% if asset.status and asset.status.strip() == '闲置' %}
+                                    <option value="{{ asset.id }}">{{ asset.asset_number }} - {{ asset.name }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                                {% set idle_assets = [] %}
+                                {% for asset in all_assets %}
+                                {% if asset.status and asset.status.strip() == '闲置' %}
+                                {% set _ = idle_assets.append(asset) %}
+                                {% endif %}
+                                {% endfor %}
+                                {% if not idle_assets %}
+                                <div class="text-danger" style="margin-top: 5px;">提示：当前没有闲置的资产</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 资产信息显示区域 -->
+                            <div id="borrow-asset-details" class="form-group" style="display: block;">
+                                <label>资产信息</label>
+                                <div class="asset-info" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9;">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>资产名称：</strong><span id="borrow-detail_name"></span></p>
+                                            <p><strong>型号：</strong><span id="borrow-detail_model"></span></p>
+                                            <p><strong>购入日期：</strong><span id="borrow-detail_purchase_date"></span></p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>参数配置：</strong></p>
+                                            <p style="margin-left: 10px;"><span id="borrow-detail_params"></span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <script>
+                            // 闲置资产信息数据
+                            var idleAssetsData = {};
+                            
+                            // 初始化闲置资产数据
+                            function initIdleAssetsData() {
+                                idleAssetsData = {};
+                                {% for asset in all_assets %}
+                                {% if asset.status and asset.status.strip() == '闲置' %}
+                                idleAssetsData[{{ asset.id }}] = {
+                                    name: "{{ asset.name | default('') | replace('"', '\\"') }}",
+                                    model: "{{ asset.model | default('') | replace('"', '\\"') }}",
+                                    purchase_date: "{{ asset.purchase_date.strftime('%Y-%m-%d') if asset.purchase_date else '' }}",
+                                    params: "{{ asset.params | default('') | replace('"', '\\"') }}"
+                                };
+                                {% endif %}
+                                {% endfor %}
+                                console.log('Idle assets data initialized:', idleAssetsData);
+                            }
+                            
+                            // 显示资产详情
+                            function showAssetDetails(assetId) {
+                                console.log('Selected asset ID:', assetId);
+                                var assetInfo = document.getElementById('borrow-asset-details');
+                                var detailName = document.getElementById('borrow-detail_name');
+                                var detailModel = document.getElementById('borrow-detail_model');
+                                var detailPurchaseDate = document.getElementById('borrow-detail_purchase_date');
+                                var detailParams = document.getElementById('borrow-detail_params');
+                                
+                                // 检查元素是否存在
+                                if (!assetInfo || !detailName || !detailModel || !detailPurchaseDate || !detailParams) {
+                                    console.log('Asset details elements not found:', {
+                                        assetInfo: assetInfo,
+                                        detailName: detailName,
+                                        detailModel: detailModel,
+                                        detailPurchaseDate: detailPurchaseDate,
+                                        detailParams: detailParams
+                                    });
+                                    return;
+                                }
+                                
+                                // 检查资产ID是否有效
+                                if (!assetId) {
+                                    // 清空资产详情
+                                    detailName.textContent = '';
+                                    detailModel.textContent = '';
+                                    detailPurchaseDate.textContent = '';
+                                    detailParams.textContent = '';
+                                    assetInfo.style.display = 'block';
+                                    return;
+                                }
+                                
+                                // 从闲置资产数据中获取资产信息
+                                assetId = parseInt(assetId);
+                                var asset = idleAssetsData[assetId];
+                                console.log('Asset found:', asset);
+                                if (asset) {
+                                    // 设置资产详情
+                                    detailName.textContent = asset.name || '-';
+                                    detailModel.textContent = asset.model || '-';
+                                    detailPurchaseDate.textContent = asset.purchase_date || '-';
+                                    detailParams.textContent = asset.params || '-';
+                                    assetInfo.style.display = 'block';
+                                    
+                                    // 调试信息
+                                    console.log('Asset details displayed:', {
+                                        name: detailName.textContent,
+                                        model: detailModel.textContent,
+                                        purchase_date: detailPurchaseDate.textContent,
+                                        params: detailParams.textContent
+                                    });
+                                } else {
+                                    // 资产不存在，清空详情
+                                    detailName.textContent = '';
+                                    detailModel.textContent = '';
+                                    detailPurchaseDate.textContent = '';
+                                    detailParams.textContent = '';
+                                    assetInfo.style.display = 'block';
+                                    console.log('Asset not found in idleAssetsData:', assetId);
+                                    console.log('Idle assets data keys:', Object.keys(idleAssetsData));
+                                }
+                            }
+                            
+                            // 为资产借用模态框添加事件监听器
+                            function setupAssetBorrowModal() {
+                                // 初始化闲置资产数据
+                                initIdleAssetsData();
+                                
+                                // 为资产选择下拉框添加事件监听器
+                                var assetSelect = document.getElementById('asset_id');
+                                if (assetSelect) {
+                                    console.log('Asset select element found in modal:', assetSelect);
+                                    // 移除可能存在的旧事件监听器
+                                    assetSelect.onchange = null;
+                                    // 添加新的事件监听器
+                                    assetSelect.addEventListener('change', function() {
+                                        showAssetDetails(this.value);
+                                    });
+                                } else {
+                                    console.log('Asset select element not found in modal');
+                                }
+                            }
+                            
+                            // 页面加载完成后执行
+                            document.addEventListener('DOMContentLoaded', function() {
+                                console.log('Document ready');
+                                
+                                // 初始化闲置资产数据
+                                initIdleAssetsData();
+                                
+                                // 为资产借用模态框添加显示事件监听器
+                                $('#assetBorrowModal').on('shown.bs.modal', function () {
+                                    console.log('Asset borrow modal shown');
+                                    // 当模态框显示时，重新设置事件监听器
+                                    setupAssetBorrowModal();
+                                });
+                            });
+                            </script>
+                            <div class="form-group">
+                                <label for="borrower">借用人</label>
+                                <input type="text" class="form-control" id="borrower" name="borrower" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="borrow_date">借用日期</label>
+                                <input type="date" class="form-control" id="borrow_date" name="borrow_date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="return_date">预计归还日期</label>
+                                <input type="date" class="form-control" id="return_date" name="return_date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="borrow_remarks">备注</label>
+                                <input type="text" class="form-control" id="borrow_remarks" name="remarks">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">保存</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- 资产归还标签页 -->
+                    <div role="tabpanel" class="tab-pane" id="return-tab">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title">借用中资产</h3>
+                            </div>
+                            <div class="panel-body">
+                                <table class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>资产编号</th>
+                                            <th>资产名称</th>
+                                            <th>借用人</th>
+                                            <th>借用日期</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if borrowed_assets %}
+                                        {% for borrow in borrowed_assets %}
+                                        {% set asset = all_assets | selectattr('id', 'equalto', borrow.asset_id) | first %}
+                                        <tr>
+                                            <td>{{ asset.asset_number }}</td>
+                                            <td>{{ asset.name }}</td>
+                                            <td>{{ borrow.borrower }}</td>
+                                            <td>{{ borrow.borrow_date.strftime('%Y-%m-%d') }}</td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-success return-asset-btn" data-id="{{ borrow.id }}" data-asset-id="{{ borrow.asset_id }}">
+                                                    归还
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="5" class="text-center">暂无借用中资产</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 资产移交模态框 -->
+<div class="modal fade" id="assetTransferModal" tabindex="-1" role="dialog" aria-labelledby="assetTransferModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="assetTransferModalLabel">资产移交</h4>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="#" onsubmit="return submitTransferForm(this);">
+                    <div class="form-group">
+                        <label for="transfer_asset_id">资产选择</label>
+                        <select class="form-control" id="transfer_asset_id" name="asset_id" required>
+                            <option value="">请选择资产</option>
+                            {% for asset in all_assets %}
+                            <option value="{{ asset.id }}">{{ asset.asset_number }} - {{ asset.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_department">原部门</label>
+                        <input type="text" class="form-control" id="from_department" name="from_department" required readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_department">转入部门</label>
+                        <select class="form-control" id="to_department" name="to_department" required>
+                            <option value="">请选择</option>
+                            {% for department in departments %}
+                            <option value="{{ department.name }}">{{ department.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_user">原使用人</label>
+                        <input type="text" class="form-control" id="from_user" name="from_user" required readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_user">转入人</label>
+                        <input type="text" class="form-control" id="to_user" name="to_user">
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_date">移交日期</label>
+                        <input type="date" class="form-control" id="transfer_date" name="transfer_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_remarks">备注</label>
+                        <input type="text" class="form-control" id="transfer_remarks" name="remarks">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑资产模态框 -->
+<div class="modal fade" id="editAssetModal" tabindex="-1" role="dialog" aria-labelledby="editAssetModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="editAssetModalLabel">编辑资产</h4>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{{ url_for('edit_asset') }}">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" id="edit_asset_id" name="id">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit_asset_number">资产编号</label>
+                                <input type="text" class="form-control" id="edit_asset_number" name="asset_number" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_category">资产分类</label>
+                                <select class="form-control" id="edit_category" name="category" required>
+                                    <option value="">请选择</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.name }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_name">资产名称</label>
+                                <input type="text" class="form-control" id="edit_name" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_model">型号</label>
+                                <input type="text" class="form-control" id="edit_model" name="model">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_serial_number">序列号</label>
+                                <input type="text" class="form-control" id="edit_serial_number" name="serial_number">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_quantity">数量</label>
+                                <input type="number" class="form-control" id="edit_quantity" name="quantity" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_department">所属部门</label>
+                                <select class="form-control" id="edit_department" name="department">
+                                    <option value="">请选择部门</option>
+                                    {% for department in departments %}
+                                    <option value="{{ department.name }}">{{ department.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_assigned_to">使用人</label>
+                                <input type="text" class="form-control" id="edit_assigned_to" name="assigned_to">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit_purchase_date">购入日期</label>
+                                <input type="date" class="form-control" id="edit_purchase_date" name="purchase_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_warranty_period">保修年限</label>
+                                <input type="number" class="form-control" id="edit_warranty_period" name="warranty_period" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_purchase_amount">购置金额</label>
+                                <input type="number" class="form-control" id="edit_purchase_amount" name="purchase_amount" step="0.01" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_location">存放地点</label>
+                                <input type="text" class="form-control" id="edit_location" name="location">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_status">资产状态</label>
+                                <select class="form-control" id="edit_status" name="status" required>
+                                    <option value="在用">在用</option>
+                                    <option value="闲置">闲置</option>
+                                    <option value="维修">维修</option>
+                                    <option value="报废">报废</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_remarks">备注</label>
+                                <input type="text" class="form-control" id="edit_remarks" name="remarks">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_params">参数配置</label>
+                                <textarea class="form-control" id="edit_params" name="params" rows="4"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+// 显示内容区域的函数
+function showContent(targetId) {
+    console.log('Showing content for:', targetId);
+    
+    // 隐藏所有内容区域
+    var contentAreas = document.querySelectorAll('.content-area');
+    console.log('Found content areas:', contentAreas.length);
+    
+    contentAreas.forEach(function(area) {
+        area.style.display = 'none';
+    });
+    
+    // 显示目标内容区域
+    var targetArea = document.getElementById(targetId);
+    console.log('Found target area:', targetArea);
+    
+    if (targetArea) {
+        targetArea.style.display = 'block';
+        console.log('Displayed target area:', targetId);
+        
+        // 更新URL，添加content参数
+        var url = new URL(window.location.href);
+        url.searchParams.set('content', targetId);
+        history.replaceState(null, '', url);
+        
+        // 更新导航链接的激活状态
+        var navLinks = document.querySelectorAll('.sidebar a');
+        navLinks.forEach(function(link) {
+            link.classList.remove('active');
+        });
+        
+        // 找到当前点击的链接并添加active类
+        // 使用更可靠的方法，根据href属性和targetId来查找链接
+        navLinks.forEach(function(link) {
+            if (link.getAttribute('href') === '#' + targetId) {
+                link.classList.add('active');
+                console.log('Added active class to link:', link.textContent);
+            }
+        });
+    } else {
+        // 如果没有目标区域，显示默认的资产列表
+        var defaultArea = document.getElementById('asset-list');
+        if (defaultArea) {
+            defaultArea.style.display = 'block';
+            console.log('Displayed default asset list area');
+        }
+    }
+}
+
+// 处理导航链接点击
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing navigation');
+    
+    // 检查URL参数，显示指定的内容区域
+    function checkUrlParams() {
+        var urlParams = new URLSearchParams(window.location.search);
+        var contentParam = urlParams.get('content');
+        var pageParam = urlParams.get('page');
+        console.log('Found content param:', contentParam);
+        console.log('Found page param:', pageParam);
+        
+        if (contentParam) {
+            showContent(contentParam);
+        } else {
+            // 默认显示资产列表
+            showContent('asset-list');
+        }
+        
+        // 更新导航链接的激活状态
+        var navLinks = document.querySelectorAll('.sidebar a');
+        navLinks.forEach(function(link) {
+            link.classList.remove('active');
+        });
+        
+        // 根据URL参数设置相应链接的激活状态
+        if (contentParam) {
+            // 如果是基础设置下的功能，激活对应的链接
+            if (contentParam === 'category-management') {
+                var categoryLink = document.getElementById('category-management-link');
+                if (categoryLink) {
+                    categoryLink.classList.add('active');
+                    console.log('Added active class to category management link');
+                }
+            } else if (contentParam === 'department-management') {
+                var departmentLink = document.getElementById('department-management-link');
+                if (departmentLink) {
+                    departmentLink.classList.add('active');
+                    console.log('Added active class to department management link');
+                }
+            } else if (contentParam === 'user-management') {
+                var userLink = document.getElementById('user-management-link');
+                if (userLink) {
+                    userLink.classList.add('active');
+                    console.log('Added active class to user management link');
+                }
+            }
+        } else if (pageParam === 'query') {
+            // 如果是资产查询页面，激活资产查询链接
+            var assetQueryLink = document.getElementById('asset-query-link');
+            if (assetQueryLink) {
+                assetQueryLink.classList.add('active');
+                console.log('Added active class to asset query link');
+            }
+        } else {
+            // 如果是资产管理页面，激活资产管理链接
+            var assetManagementLink = document.getElementById('asset-management-link');
+            if (assetManagementLink) {
+                assetManagementLink.classList.add('active');
+                console.log('Added active class to asset management link');
+            }
+        }
+    }
+    
+    // 调用函数检查URL参数
+    checkUrlParams();
+    
+    // 为资产管理和资产查询链接添加点击事件监听器
+    var assetManagementLink = document.getElementById('asset-management-link');
+    var assetQueryLink = document.getElementById('asset-query-link');
+    
+    if (assetManagementLink) {
+        assetManagementLink.addEventListener('click', function() {
+            var navLinks = document.querySelectorAll('.sidebar a');
+            navLinks.forEach(function(link) {
+                link.classList.remove('active');
+            });
+            assetManagementLink.classList.add('active');
+            document.querySelector('.top-bar h1').textContent = '资产管理';
+        });
+    }
+    
+    if (assetQueryLink) {
+        assetQueryLink.addEventListener('click', function() {
+            var navLinks = document.querySelectorAll('.sidebar a');
+            navLinks.forEach(function(link) {
+                link.classList.remove('active');
+            });
+            assetQueryLink.classList.add('active');
+            document.querySelector('.top-bar h1').textContent = '资产查询';
+        });
+    }
+    
+    // 初始化资产数据
+    var assetData = {
+        {% for asset in all_assets %}
+        '{{ asset.id }}': {
+            department: '{{ asset.department or '' }}',
+            assigned_to: '{{ asset.assigned_to or '' }}'
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    };
+    
+    // 为资产选择下拉框添加事件监听器
+    var transferAssetSelect = document.getElementById('transfer_asset_id');
+    if (transferAssetSelect) {
+        transferAssetSelect.addEventListener('change', function() {
+            var assetId = this.value;
+            if (assetId) {
+                var asset = assetData[assetId];
+                if (asset) {
+                    document.getElementById('from_department').value = asset.department;
+                    document.getElementById('from_user').value = asset.assigned_to;
+                }
+            } else {
+                document.getElementById('from_department').value = '';
+                document.getElementById('from_user').value = '';
+            }
+        });
+    }
+    
+    // 为可折叠导航标题添加事件监听器
+    var collapsibleHeaders = document.querySelectorAll('.nav-header.collapsible');
+    collapsibleHeaders.forEach(function(header) {
+        header.addEventListener('click', function() {
+            this.classList.toggle('collapsed');
+            var section = this.nextElementSibling;
+            if (section && section.classList.contains('nav-section')) {
+                section.classList.toggle('collapsed');
+            }
+        });
+    });
+    
+    // 为资产行添加双击事件监听器
+    var assetRows = document.querySelectorAll('.asset-row');
+    assetRows.forEach(function(row) {
+        row.addEventListener('dblclick', function() {
+            var id = parseInt(row.getAttribute('data-id'));
+            var assetNumber = row.getAttribute('data-asset-number');
+            var name = row.getAttribute('data-name');
+            var category = row.getAttribute('data-category');
+            var model = row.getAttribute('data-model');
+            var serialNumber = row.getAttribute('data-serial-number');
+            var quantity = parseInt(row.getAttribute('data-quantity'));
+            var department = row.getAttribute('data-department');
+            var assignedTo = row.getAttribute('data-assigned-to');
+            var purchaseDate = row.getAttribute('data-purchase-date');
+            var warrantyPeriod = row.getAttribute('data-warranty-period') || null;
+            var purchaseAmount = parseFloat(row.getAttribute('data-purchase-amount')) || 0;
+            var location = row.getAttribute('data-location');
+            var status = row.getAttribute('data-status');
+            var remarks = row.getAttribute('data-remarks');
+            var params = row.getAttribute('data-params');
+            
+            var logs = JSON.parse(row.getAttribute('data-logs') || '[]');
+            viewAssetDetails(id, assetNumber, name, category, model, serialNumber, quantity, department, assignedTo, purchaseDate, warrantyPeriod, purchaseAmount, location, status, remarks, params, logs);
+        });
+    });
+    
+    // 为编辑按钮添加点击事件监听器
+    var editButtons = document.querySelectorAll('.edit-asset-btn');
+    editButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            var row = button.closest('.asset-row');
+            if (row) {
+                var id = parseInt(row.getAttribute('data-id'));
+                var assetNumber = row.getAttribute('data-asset-number');
+                var name = row.getAttribute('data-name');
+                var category = row.getAttribute('data-category');
+                var model = row.getAttribute('data-model');
+                var serialNumber = row.getAttribute('data-serial-number');
+                var quantity = parseInt(row.getAttribute('data-quantity'));
+                var department = row.getAttribute('data-department');
+                var assignedTo = row.getAttribute('data-assigned-to');
+                var purchaseDate = row.getAttribute('data-purchase-date');
+                var warrantyPeriod = row.getAttribute('data-warranty-period') || null;
+                var purchaseAmount = parseFloat(row.getAttribute('data-purchase-amount')) || 0;
+                var location = row.getAttribute('data-location');
+                var status = row.getAttribute('data-status');
+                var remarks = row.getAttribute('data-remarks');
+                var params = row.getAttribute('data-params');
+                
+                editAsset(id, assetNumber, name, category, model, serialNumber, quantity, department, assignedTo, purchaseDate, warrantyPeriod, purchaseAmount, location, status, remarks, params);
+            }
+        });
+    });
+    
+    // 为详情按钮添加点击事件监听器
+    var viewButtons = document.querySelectorAll('.view-asset-btn');
+    viewButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            var row = button.closest('.asset-row');
+            if (row) {
+                var id = parseInt(row.getAttribute('data-id'));
+                var assetNumber = row.getAttribute('data-asset-number');
+                var name = row.getAttribute('data-name');
+                var category = row.getAttribute('data-category');
+                var model = row.getAttribute('data-model');
+                var serialNumber = row.getAttribute('data-serial-number');
+                var quantity = parseInt(row.getAttribute('data-quantity'));
+                var department = row.getAttribute('data-department');
+                var assignedTo = row.getAttribute('data-assigned-to');
+                var purchaseDate = row.getAttribute('data-purchase-date');
+                var warrantyPeriod = row.getAttribute('data-warranty-period') || null;
+                var purchaseAmount = parseFloat(row.getAttribute('data-purchase-amount')) || 0;
+                var location = row.getAttribute('data-location');
+                var status = row.getAttribute('data-status');
+                var remarks = row.getAttribute('data-remarks');
+                var params = row.getAttribute('data-params');
+                
+                var logs = JSON.parse(row.getAttribute('data-logs') || '[]');
+                viewAssetDetails(id, assetNumber, name, category, model, serialNumber, quantity, department, assignedTo, purchaseDate, warrantyPeriod, purchaseAmount, location, status, remarks, params, logs);
+            }
+        });
+    });
+    
+    // 为导出按钮添加点击事件监听器
+    var exportButton = document.querySelector('.export-selected-btn');
+    if (exportButton) {
+        exportButton.addEventListener('click', function() {
+            // 获取所有选中的资产复选框
+            var selectedCheckboxes = document.querySelectorAll('.asset-checkbox:checked');
+            var selectedAssetIds = [];
+            
+            // 收集选中的资产ID
+            selectedCheckboxes.forEach(function(checkbox) {
+                selectedAssetIds.push(checkbox.value);
+            });
+            
+            // 检查是否有选中的资产
+            if (selectedAssetIds.length === 0) {
+                alert('请先选择要导出的资产');
+                return;
+            }
+            
+            // 获取导出表单和隐藏字段
+            var exportForm = document.getElementById('export-form');
+            var selectedAssetsInput = document.getElementById('selected-assets');
+            
+            // 检查表单和隐藏字段是否存在
+            if (!exportForm || !selectedAssetsInput) {
+                alert('导出功能初始化失败，请刷新页面重试');
+                return;
+            }
+            
+            // 设置选中的资产ID
+            selectedAssetsInput.value = selectedAssetIds.join(',');
+            
+            // 提交表单
+            exportForm.submit();
+        });
+    }
+    
+    // 获取所有导航链接
+    var navLinks = document.querySelectorAll('.sidebar a');
+    console.log('Found navigation links:', navLinks.length);
+    
+    // 为每个链接添加点击事件
+    navLinks.forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            // 检查是否是基础设置下的链接
+            var href = this.getAttribute('href');
+            if (href.includes('content=category-management') || href.includes('content=department-management') || href.includes('content=user-management')) {
+                e.preventDefault();
+                
+                // 隐藏所有内容区域
+                var contentAreas = document.querySelectorAll('.content-area');
+                contentAreas.forEach(function(area) {
+                    area.style.display = 'none';
+                });
+                
+                // 显示目标内容区域
+                if (href.includes('content=category-management')) {
+                    document.getElementById('category-management').style.display = 'block';
+                    document.querySelector('.top-bar h1').textContent = '类别管理';
+                } else if (href.includes('content=department-management')) {
+                    document.getElementById('department-management').style.display = 'block';
+                    document.querySelector('.top-bar h1').textContent = '部门管理';
+                } else if (href.includes('content=user-management')) {
+                    document.getElementById('user-management').style.display = 'block';
+                    document.querySelector('.top-bar h1').textContent = '用户管理';
+                }
+                
+                // 更新URL参数
+                window.history.pushState({}, '', href);
+                
+                // 更新导航激活状态
+                var allNavLinks = document.querySelectorAll('.sidebar a');
+                allNavLinks.forEach(function(navLink) {
+                    navLink.classList.remove('active');
+                });
+                this.classList.add('active');
+            }
+        });
+    });
+    
+    // 为资产列表链接添加点击事件
+    var assetListLink = document.getElementById('asset-list-link');
+    if (assetListLink) {
+        assetListLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            showContent('asset-list');
+        });
+    }
+});
+</script>
+
+{% endblock %}
