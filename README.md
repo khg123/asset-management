@@ -206,8 +206,8 @@ asset-management/
 ## 联系方式
 
 如有问题或建议，欢迎通过以下方式联系：
-- 邮箱：your-email@example.com
-- GitHub：<https://github.com/yourusername/asset-management>
+- 邮箱：diom@msn.cn
+- GitHub：<https://github.com/khg123/asset-management>
 
 ---
 
